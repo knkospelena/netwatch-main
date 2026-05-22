@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetWatch SOC Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- Using jQuery for simplicity in this demo -->
+</head>
+<body>
+
+<header>
+    <div class="logo">NetWatch <span style="font-size: 0.8rem; opacity: 0.7;">v1.0</span></div>
+    <div class="status-indicator">
+        <div class="status-dot"></div>
+        SYSTEM ONLINE <span class="refresh-status" id="last-updated">Updating...</span>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Key Metrics / Heads-Up Display -->
+    <div class="stats-grid">
+        <div class="stat-card risk" id="risk-card">
+            <h3>Current Risk Score</h3>
+            <div class="stat-value" id="risk-score">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Active Alerts</h3>
+            <div class="stat-value" id="alert-count">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>High Severity Events</h3>
+            <div class="stat-value" id="high-sev-count" style="color: var(--accent-alert-high)">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>Packets Monitored</h3>
+            <div class="stat-value" id="traffic-count">0</div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('alerts')">Alerts & Risk Analysis</button>
+        <button class="tab-btn" onclick="openTab('traffic')">All Traffic (Live)</button>
+    </div>
+
+    <!-- Alerts Tab -->
+    <div id="alerts" class="tab-content active">
+        <div class="data-table-container">
+            <div class="panel-header">
+                <h2 class="panel-title">Security Alerts & Anomalies</h2>
+                <div style="font-size: 0.8rem; color: #888;">Real-time Correlation</div>
+            </div>
+            <table id="alerts-table">
+                <thead>
+                    <tr>
+                        <th width="10%">Time</th>
+                        <th width="10%">Severity</th>
+                        <th width="15%">Type</th>
+                        <th width="20%">Source</th>
+                        <th width="20%">Target</th>
+                        <th width="25%">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Traffic Tab -->
+    <div id="traffic" class="tab-content">
+        <div class="data-table-container">
+            <div class="panel-header">
+                <h2 class="panel-title">Network Traffic Log</h2>
+                <div style="font-size: 0.8rem; color: #888;">Full Packet Capture Stream (Last 1000)</div>
+            </div>
+            <table id="traffic-table">
+                <thead>
+                    <tr>
+                        <th width="10%">Time</th>
+                        <th width="10%">Protocol</th>
+                        <th width="20%">Source IP:Port</th>
+                        <th width="5%"></th>
+                        <th width="20%">Dest IP:Port</th>
+                        <th width="10%">Len</th>
+                        <th width="25%">Info</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Tab Switching Logic
+    function openTab(tabName) {
+        $('.tab-content').removeClass('active');
+        $('.tab-btn').removeClass('active');
+        
+        $('#' + tabName).addClass('active');
+        $(`button[onclick="openTab('${tabName}')"]`).addClass('active');
+    }
+
+    // Data Fetching & Rendering
+    function updateDashboard() {
+        // 1. Update Stats
+        $.getJSON('/api/stats', function(data) {
+            $('#risk-score').text(data.risk_score);
+            $('#alert-count').text(data.alert_count);
+            $('#traffic-count').text(data.traffic_count);
+            $('#high-sev-count').text(data.high_severity);
+            
+            let now = new Date();
+            $('#last-updated').text('Last update: ' + now.toLocaleTimeString());
+            
+            // Visual feedback for high risk
+            if(data.risk_score > 50) {
+                $('#risk-card').css('box-shadow', '0 0 15px rgba(255, 82, 82, 0.5)');
+            }
+        });
+
+        // 2. Update Alerts
+        $.getJSON('/api/alerts', function(data) {
+            let rows = '';
+            // Only show last 20 for performance in this demo view
+            data.slice(0, 20).forEach(alert => { 
+                let sevClass = 'severity-low';
+                let rowClass = '';
+                
+                if (alert.severity === 'HIGH') { 
+                    sevClass = 'severity-high'; 
+                    rowClass = 'row-high';
+                } else if (alert.severity === 'MEDIUM') {
+                    sevClass = 'severity-medium';
+                    rowClass = 'row-medium';
+                }
+
+                rows += `<tr class="${rowClass}">
+                    <td>${alert.timestamp}</td>
+                    <td class="${sevClass}">${alert.severity}</td>
+                    <td>${alert.type}</td>
+                    <td>${alert.source}</td>
+                    <td>${alert.target}</td>
+                    <td>${alert.description}</td>
+                </tr>`;
+            });
+            $('#alerts-table tbody').html(rows);
+        });
+
+        // 3. Update Traffic (If tab is active, to save resources)
+        if ($('#traffic').hasClass('active')) {
+            $.getJSON('/api/traffic', function(data) {
+                let rows = '';
+                data.slice(0, 50).forEach(pkt => { // Show last 50
+                    rows += `<tr>
+                        <td>${pkt.timestamp}</td>
+                        <td>${pkt.protocol}</td>
+                        <td>${pkt.src}:${pkt.sport}</td>
+                        <td>&rarr;</td>
+                        <td>${pkt.dst}:${pkt.dport}</td>
+                        <td>${pkt.len}</td>
+                        <td>${pkt.info}</td>
+                    </tr>`;
+                });
+                $('#traffic-table tbody').html(rows);
+            });
+        }
+    }
+
+    // Refresh every 2 seconds
+    setInterval(updateDashboard, 2000);
+    updateDashboard(); // Initial call
+</script>
+
+</body>
+</html>
