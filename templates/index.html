@@ -3,181 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetWatch SOC Dashboard</title>
+    <title>NetWatch SOC Dashboard v2.0</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- Using jQuery for simplicity in this demo -->
+    <style>
+        :root {
+            --bg:        #f0f4f8;
+            --surface:   #ffffff;
+            --surface2:  #e8f0fe;
+            --border:    #c7d7f5;
+            --text:      #1e3a5f;
+            --muted:     #6b87a8;
+            --cyan:      #1a73e8;
+            --green:     #1e8c45;
+            --yellow:    #d97706;
+            --orange:    #c2410c;
+            --red:       #dc2626;
+            --purple:    #7c3aed;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 13px; }
+
+        /* ── Header ── */
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            border-bottom: 1px solid #1565c0;
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 2px 8px rgba(26,115,232,.25);
+        }
+        .logo { font-size: 1.3rem; font-weight: 700; letter-spacing: 3px; color: #ffffff; }
+        .logo span { font-size: 0.7rem; color: rgba(255,255,255,.65); letter-spacing: 1px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; animation: pulse 2s infinite; margin-right: 6px; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .uptime { color: rgba(255,255,255,.75); font-size: 0.75rem; }
+        .btn-sm {
+            padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3);
+            background: rgba(255,255,255,.15); color: #fff; cursor: pointer; font-size: 12px;
+            transition: all .2s;
+        }
+        .btn-sm:hover { background: rgba(255,255,255,.28); border-color: #fff; }
+        .btn-danger { border-color: rgba(255,100,100,.5); color: #fca5a5; }
+        .btn-danger:hover { background: rgba(220,38,38,.25); }
+
+        /* ── Stats Grid ── */
+        .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding: 16px 24px; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px;
+            box-shadow: 0 1px 4px rgba(26,115,232,.08);
+            transition: box-shadow .2s, border-color .2s;
+        }
+        .stat-card:hover { border-color: var(--cyan); box-shadow: 0 4px 12px rgba(26,115,232,.15); }
+        .stat-card h3 { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+        .val-cyan   { color: #1a73e8; }
+        .val-red    { color: var(--red); }
+        .val-orange { color: var(--orange); }
+        .val-yellow { color: var(--yellow); }
+        .val-green  { color: var(--green); }
+        .val-purple { color: var(--purple); }
+
+        /* ── Tabs ── */
+        .tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 2px solid var(--border); background: var(--surface); }
+        .tab-btn {
+            padding: 10px 18px; border: none; background: none; color: var(--muted);
+            cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -2px;
+            transition: all .2s;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); font-weight: 600; }
+        .tab-content { display: none; padding: 16px 24px; }
+        .tab-content.active { display: block; }
+
+        /* ── Panel ── */
+        .panel {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; overflow: hidden; margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(26,115,232,.07);
+        }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            background: linear-gradient(90deg, #e8f0fe 0%, #f8faff 100%);
+        }
+        .panel-title { font-size: 0.85rem; font-weight: 700; letter-spacing: 1px; color: #1a73e8; }
+        .panel-sub { font-size: 0.72rem; color: var(--muted); }
+
+        /* ── Alert Cards ── */
+        #alert-list { padding: 8px; display: flex; flex-direction: column; gap: 8px; max-height: 65vh; overflow-y: auto; }
+        .alert-card {
+            background: #fafcff; border-radius: 8px; border: 1px solid var(--border);
+            border-left: 4px solid var(--muted);
+            padding: 12px 14px; transition: transform .15s, box-shadow .15s;
+        }
+        .alert-card:hover { transform: translateX(2px); box-shadow: 0 3px 10px rgba(26,115,232,.1); }
+        .alert-card.HIGH     { border-left-color: var(--red);    background: #fff8f8; }
+        .alert-card.MEDIUM   { border-left-color: var(--yellow); background: #fffbf0; }
+        .alert-card.CRITICAL { border-left-color: var(--purple); background: #faf5ff; }
+        .alert-card.LOW      { border-left-color: #22c55e;       background: #f0fdf4; }
+
+        .alert-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+        .badge {
+            padding: 2px 8px; border-radius: 4px; font-size: 0.68rem;
+            font-weight: 700; letter-spacing: .5px;
+        }
+        .badge.HIGH     { background: rgba(220,38,38,.12);  color: #b91c1c; }
+        .badge.MEDIUM   { background: rgba(217,119,6,.12);  color: #92400e; }
+        .badge.CRITICAL { background: rgba(124,58,237,.12); color: #5b21b6; }
+        .badge.LOW      { background: rgba(21,128,61,.1);   color: #166534; }
+        .badge.type     { background: rgba(26,115,232,.1);  color: #1a73e8; }
+        .badge.mitre    { background: rgba(194,65,12,.1);   color: #9a3412; font-family: monospace; }
+
+        .alert-title { font-weight: 600; font-size: 0.88rem; color: var(--text); }
+        .alert-meta  { font-size: 0.72rem; color: var(--muted); }
+        .alert-route { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; margin: 4px 0; }
+        .arrow       { color: var(--muted); }
+        .ip-tag      { background: #e8f0fe; border-radius: 4px; padding: 1px 6px; font-family: monospace; color: #1a73e8; }
+        .alert-detail { font-size: 0.78rem; color: #4b6280; line-height: 1.5; margin-top: 6px; }
+        .alert-reco {
+            margin-top: 8px; padding: 6px 10px;
+            background: #f0fdf4; border-radius: 6px; border-left: 3px solid #22c55e;
+            font-size: 0.75rem; color: #166534;
+        }
+        .alert-reco-label { font-weight: 700; color: #15803d; margin-bottom: 2px; }
+        .alert-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .alert-actions .btn-sm {
+            background: #fff; color: var(--text); border: 1px solid var(--border);
+        }
+        .alert-actions .btn-sm:hover { border-color: var(--cyan); color: var(--cyan); background: #e8f0fe; }
+        .alert-actions .btn-danger { color: var(--red); border-color: rgba(220,38,38,.3); }
+        .alert-actions .btn-danger:hover { background: #fff8f8; }
+
+        /* ── Table ── */
+        .tbl-wrap { max-height: 65vh; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { position: sticky; top: 0; background: #e8f0fe; color: #1a73e8; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--border); font-weight: 700; }
+        td { padding: 8px 12px; border-bottom: 1px solid #e8f0fe; font-size: 0.8rem; color: var(--text); }
+        tr:hover td { background: #f0f7ff; }
+        tr.row-high   td { border-left: 3px solid var(--red); background: #fff8f8; }
+        tr.row-medium td { border-left: 3px solid var(--yellow); background: #fffbf0; }
+
+        /* ── Top Talkers ── */
+        .talker-bar { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .talker-ip  { font-family: monospace; width: 130px; flex-shrink: 0; color: #1a73e8; }
+        .bar-track  { flex: 1; background: #e8f0fe; border-radius: 4px; height: 8px; }
+        .bar-fill   { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1a73e8, #42a5f5); transition: width .4s; }
+        .talker-count { color: var(--muted); width: 40px; text-align: right; font-size: 0.75rem; }
+
+        /* ── Blocked IPs ── */
+        .blocked-list { padding: 8px; }
+        .blocked-tag { display: inline-flex; align-items: center; gap: 6px; background: #fff5f5; border: 1px solid rgba(220,38,38,.25); border-radius: 20px; padding: 3px 10px; margin: 3px; font-family: monospace; font-size: 0.78rem; color: var(--red); }
+
+        /* ── Filter bar ── */
+        .filter-bar { display: flex; gap: 8px; padding: 10px 16px; align-items: center; border-bottom: 1px solid var(--border); }
+        .filter-bar select, .filter-bar input {
+            background: #fff; border: 1px solid var(--border); color: var(--text);
+            border-radius: 6px; padding: 5px 10px; font-size: 12px; outline: none;
+        }
+        .filter-bar select:focus, .filter-bar input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(26,115,232,.1); }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f0f4f8; }
+        ::-webkit-scrollbar-thumb { background: #c7d7f5; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #1a73e8; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1100px) { .stats-grid { grid-template-columns: repeat(3,1fr); } }
+        @media (max-width: 700px)  { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+    </style>
 </head>
 <body>
 
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
 <header>
-    <div class="logo">NetWatch <span style="font-size: 0.8rem; opacity: 0.7;">v1.0</span></div>
-    <div class="status-indicator">
-        <div class="status-dot"></div>
-        SYSTEM ONLINE <span class="refresh-status" id="last-updated">Updating...</span>
+    <div class="logo">NETWATCH <span>SOC v2.0</span></div>
+    <div class="header-right">
+        <span class="uptime" id="uptime-display">Uptime: 0m</span>
+        <div><div class="status-dot" style="display:inline-block"></div><span style="color:#64748b;font-size:.75rem" id="last-updated">Connecting...</span></div>
+        <button class="btn-sm btn-danger" onclick="clearAlerts()">Clear Alerts</button>
     </div>
 </header>
 
-<div class="container">
+<!-- ── Stats Grid ─────────────────────────────────────────────────────────── -->
+<div class="stats-grid">
+    <div class="stat-card"><h3>Risk Score</h3><div class="stat-value val-red"   id="risk-score">0</div></div>
+    <div class="stat-card"><h3>Total Alerts</h3><div class="stat-value val-orange" id="alert-count">0</div></div>
+    <div class="stat-card"><h3>Critical</h3><div class="stat-value val-purple" id="crit-count">0</div></div>
+    <div class="stat-card"><h3>High Severity</h3><div class="stat-value val-red"   id="high-count">0</div></div>
+    <div class="stat-card"><h3>Packets Seen</h3><div class="stat-value val-cyan"   id="traffic-count">0</div></div>
+    <div class="stat-card"><h3>Blocked IPs</h3><div class="stat-value val-yellow" id="blocked-count">0</div></div>
+</div>
 
-    <!-- Key Metrics / Heads-Up Display -->
-    <div class="stats-grid">
-        <div class="stat-card risk" id="risk-card">
-            <h3>Current Risk Score</h3>
-            <div class="stat-value" id="risk-score">0</div>
-        </div>
-        <div class="stat-card">
-            <h3>Active Alerts</h3>
-            <div class="stat-value" id="alert-count">0</div>
-        </div>
-        <div class="stat-card">
-            <h3>High Severity Events</h3>
-            <div class="stat-value" id="high-sev-count" style="color: var(--accent-alert-high)">0</div>
-        </div>
-        <div class="stat-card">
-            <h3>Packets Monitored</h3>
-            <div class="stat-value" id="traffic-count">0</div>
-        </div>
-    </div>
+<!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab('tab-alerts')">🚨 Security Alerts</button>
+    <button class="tab-btn" onclick="openTab('tab-traffic')">📡 Live Traffic</button>
+    <button class="tab-btn" onclick="openTab('tab-talkers')">📊 Top Talkers</button>
+    <button class="tab-btn" onclick="openTab('tab-blocked')">🚫 Blocked IPs</button>
+</div>
 
-    <!-- Navigation Tabs -->
-    <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('alerts')">Alerts & Risk Analysis</button>
-        <button class="tab-btn" onclick="openTab('traffic')">All Traffic (Live)</button>
-    </div>
-
-    <!-- Alerts Tab -->
-    <div id="alerts" class="tab-content active">
-        <div class="data-table-container">
-            <div class="panel-header">
-                <h2 class="panel-title">Security Alerts & Anomalies</h2>
-                <div style="font-size: 0.8rem; color: #888;">Real-time Correlation</div>
+<!-- ── Alerts Tab ─────────────────────────────────────────────────────────── -->
+<div id="tab-alerts" class="tab-content active">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">SECURITY ALERTS &amp; ANOMALIES</div>
+                <div class="panel-sub">Real-time detection · Port Scan · Brute Force · ICMP Flood · DNS Tunnel · Suspicious Ports</div>
             </div>
-            <table id="alerts-table">
-                <thead>
-                    <tr>
-                        <th width="10%">Time</th>
-                        <th width="10%">Severity</th>
-                        <th width="15%">Type</th>
-                        <th width="20%">Source</th>
-                        <th width="20%">Target</th>
-                        <th width="25%">Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
+            <div class="filter-bar" style="padding:0;border:none">
+                <select id="sev-filter" onchange="renderAlerts()">
+                    <option value="">All Severity</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                </select>
+                <input type="text" id="ip-filter" placeholder="Filter by IP..." onkeyup="renderAlerts()" style="width:140px">
+            </div>
+        </div>
+        <div id="alert-list">
+            <div style="text-align:center;padding:40px;color:var(--muted)">Waiting for security events...</div>
         </div>
     </div>
+</div>
 
-    <!-- Traffic Tab -->
-    <div id="traffic" class="tab-content">
-        <div class="data-table-container">
-            <div class="panel-header">
-                <h2 class="panel-title">Network Traffic Log</h2>
-                <div style="font-size: 0.8rem; color: #888;">Full Packet Capture Stream (Last 1000)</div>
+<!-- ── Traffic Tab ────────────────────────────────────────────────────────── -->
+<div id="tab-traffic" class="tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">LIVE NETWORK TRAFFIC</div>
+                <div class="panel-sub">Full packet capture stream (last 100 packets)</div>
             </div>
+        </div>
+        <div class="tbl-wrap">
             <table id="traffic-table">
-                <thead>
-                    <tr>
-                        <th width="10%">Time</th>
-                        <th width="10%">Protocol</th>
-                        <th width="20%">Source IP:Port</th>
-                        <th width="5%"></th>
-                        <th width="20%">Dest IP:Port</th>
-                        <th width="10%">Len</th>
-                        <th width="25%">Info</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Populated by JS -->
-                </tbody>
+                <thead><tr>
+                    <th>Time</th><th>Protocol</th><th>Source IP:Port</th><th></th>
+                    <th>Dest IP:Port</th><th>Len</th><th>Info</th><th>Sev</th>
+                </tr></thead>
+                <tbody><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px">Capturing packets...</td></tr></tbody>
             </table>
         </div>
     </div>
+</div>
 
+<!-- ── Top Talkers Tab ────────────────────────────────────────────────────── -->
+<div id="tab-talkers" class="tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">TOP TALKERS</div>
+            <div class="panel-sub">Hosts generating the most traffic</div>
+        </div>
+        <div style="padding:16px" id="talkers-list">
+            <div style="color:var(--muted)">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Blocked IPs Tab ────────────────────────────────────────────────────── -->
+<div id="tab-blocked" class="tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">BLOCKED IP ADDRESSES</div>
+            <div class="panel-sub">Manually blocked via alert actions</div>
+        </div>
+        <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px">
+            <input type="text" id="manual-block-ip" placeholder="Enter IP to block..." style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none;flex:1">
+            <button class="btn-sm btn-danger" onclick="blockIP(document.getElementById('manual-block-ip').value)">Block</button>
+        </div>
+        <div class="blocked-list" id="blocked-list">
+            <div style="color:var(--muted);padding:20px">No blocked IPs.</div>
+        </div>
+    </div>
 </div>
 
 <script>
-    // Tab Switching Logic
-    function openTab(tabName) {
-        $('.tab-content').removeClass('active');
-        $('.tab-btn').removeClass('active');
-        
-        $('#' + tabName).addClass('active');
-        $(`button[onclick="openTab('${tabName}')"]`).addClass('active');
+// ── State ──────────────────────────────────────────────────────────────────
+let allAlerts = [];
+
+// ── Tab Switching ──────────────────────────────────────────────────────────
+function openTab(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.currentTarget.classList.add('active');
+}
+
+// ── Uptime formatter ───────────────────────────────────────────────────────
+function fmtUptime(sec) {
+    if (sec < 60) return sec + 's';
+    if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
+    return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+}
+
+// ── Render Alert Cards ─────────────────────────────────────────────────────
+function renderAlerts() {
+    const sevF  = document.getElementById('sev-filter').value;
+    const ipF   = document.getElementById('ip-filter').value.toLowerCase();
+    const list  = document.getElementById('alert-list');
+
+    let filtered = allAlerts.filter(a => {
+        if (sevF && a.severity !== sevF) return false;
+        if (ipF && !a.source.toLowerCase().includes(ipF) && !a.target.toLowerCase().includes(ipF)) return false;
+        return true;
+    });
+
+    if (!filtered.length) {
+        list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No alerts match filter.</div>';
+        return;
     }
 
-    // Data Fetching & Rendering
-    function updateDashboard() {
-        // 1. Update Stats
-        $.getJSON('/api/stats', function(data) {
-            $('#risk-score').text(data.risk_score);
-            $('#alert-count').text(data.alert_count);
-            $('#traffic-count').text(data.traffic_count);
-            $('#high-sev-count').text(data.high_severity);
-            
-            let now = new Date();
-            $('#last-updated').text('Last update: ' + now.toLocaleTimeString());
-            
-            // Visual feedback for high risk
-            if(data.risk_score > 50) {
-                $('#risk-card').css('box-shadow', '0 0 15px rgba(255, 82, 82, 0.5)');
-            }
-        });
+    const srcIP = a => a.source.split(':')[0];
 
-        // 2. Update Alerts
-        $.getJSON('/api/alerts', function(data) {
-            let rows = '';
-            // Only show last 20 for performance in this demo view
-            data.slice(0, 20).forEach(alert => { 
-                let sevClass = 'severity-low';
-                let rowClass = '';
-                
-                if (alert.severity === 'HIGH') { 
-                    sevClass = 'severity-high'; 
-                    rowClass = 'row-high';
-                } else if (alert.severity === 'MEDIUM') {
-                    sevClass = 'severity-medium';
-                    rowClass = 'row-medium';
-                }
+    list.innerHTML = filtered.slice(0, 60).map(a => `
+        <div class="alert-card ${a.severity}">
+            <div class="alert-top">
+                <span class="badge ${a.severity}">${a.severity}</span>
+                <span class="badge type">${a.attack_type || 'Alert'}</span>
+                ${a.mitre ? `<span class="badge mitre">MITRE ${a.mitre}</span>` : ''}
+                <span class="alert-title">${a.description}</span>
+                <span class="alert-meta" style="margin-left:auto">${a.timestamp}</span>
+            </div>
+            <div class="alert-route">
+                <span class="ip-tag">${a.source}</span>
+                <span class="arrow">→</span>
+                <span class="ip-tag">${a.target}</span>
+            </div>
+            ${a.detail ? `<div class="alert-detail">${a.detail}</div>` : ''}
+            ${a.recommendation ? `
+            <div class="alert-reco">
+                <div class="alert-reco-label">▶ RECOMMENDED ACTION</div>
+                ${a.recommendation}
+            </div>` : ''}
+            <div class="alert-actions">
+                <button class="btn-sm btn-danger" onclick="blockIP('${srcIP(a)}')">🚫 Block ${srcIP(a)}</button>
+            </div>
+        </div>
+    `).join('');
+}
 
-                rows += `<tr class="${rowClass}">
-                    <td>${alert.timestamp}</td>
-                    <td class="${sevClass}">${alert.severity}</td>
-                    <td>${alert.type}</td>
-                    <td>${alert.source}</td>
-                    <td>${alert.target}</td>
-                    <td>${alert.description}</td>
-                </tr>`;
-            });
-            $('#alerts-table tbody').html(rows);
-        });
+// ── Render Traffic Table ───────────────────────────────────────────────────
+function renderTraffic(data) {
+    const tbody = document.querySelector('#traffic-table tbody');
+    if (!data.length) return;
+    tbody.innerHTML = data.map(p => {
+        const rc = p.severity === 'HIGH' ? 'row-high' : p.severity === 'MEDIUM' ? 'row-medium' : '';
+        return `<tr class="${rc}">
+            <td>${p.timestamp}</td>
+            <td>${p.protocol}</td>
+            <td style="font-family:monospace">${p.src}:${p.sport}</td>
+            <td style="color:var(--muted)">→</td>
+            <td style="font-family:monospace">${p.dst}:${p.dport}</td>
+            <td>${p.len}</td>
+            <td>${p.info}</td>
+            <td><span class="badge ${p.severity}">${p.severity}</span></td>
+        </tr>`;
+    }).join('');
+}
 
-        // 3. Update Traffic (If tab is active, to save resources)
-        if ($('#traffic').hasClass('active')) {
-            $.getJSON('/api/traffic', function(data) {
-                let rows = '';
-                data.slice(0, 50).forEach(pkt => { // Show last 50
-                    rows += `<tr>
-                        <td>${pkt.timestamp}</td>
-                        <td>${pkt.protocol}</td>
-                        <td>${pkt.src}:${pkt.sport}</td>
-                        <td>&rarr;</td>
-                        <td>${pkt.dst}:${pkt.dport}</td>
-                        <td>${pkt.len}</td>
-                        <td>${pkt.info}</td>
-                    </tr>`;
-                });
-                $('#traffic-table tbody').html(rows);
-            });
-        }
-    }
+// ── Render Top Talkers ─────────────────────────────────────────────────────
+function renderTalkers(data) {
+    const el = document.getElementById('talkers-list');
+    if (!data.length) { el.innerHTML = '<div style="color:var(--muted)">No data yet.</div>'; return; }
+    const max = data[0].count;
+    el.innerHTML = data.map(t => `
+        <div class="talker-bar">
+            <span class="talker-ip">${t.ip}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${(t.count/max*100).toFixed(1)}%"></div></div>
+            <span class="talker-count">${t.count}</span>
+            <button class="btn-sm btn-danger" onclick="blockIP('${t.ip}')" style="padding:2px 8px;font-size:11px">Block</button>
+        </div>
+    `).join('');
+}
 
-    // Refresh every 2 seconds
-    setInterval(updateDashboard, 2000);
-    updateDashboard(); // Initial call
+// ── Render Blocked IPs ─────────────────────────────────────────────────────
+function renderBlocked(data) {
+    const el = document.getElementById('blocked-list');
+    if (!data.length) { el.innerHTML = '<div style="color:var(--muted);padding:20px">No blocked IPs.</div>'; return; }
+    el.innerHTML = data.map(ip => `<span class="blocked-tag">🚫 ${ip}</span>`).join('');
+}
+
+// ── Block IP ───────────────────────────────────────────────────────────────
+function blockIP(ip) {
+    if (!ip || !ip.trim()) return;
+    fetch('/api/block', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ip: ip.trim()})
+    }).then(() => { fetchBlocked(); alert('Blocked: ' + ip); });
+}
+
+// ── Clear Alerts ───────────────────────────────────────────────────────────
+function clearAlerts() {
+    if (!confirm('Clear all alerts and reset risk score?')) return;
+    fetch('/api/clear_alerts', {method:'POST'}).then(() => { allAlerts = []; renderAlerts(); });
+}
+
+// ── API Fetchers ───────────────────────────────────────────────────────────
+function fetchStats() {
+    fetch('/api/stats').then(r => r.json()).then(d => {
+        document.getElementById('risk-score').textContent    = d.risk_score;
+        document.getElementById('alert-count').textContent   = d.alert_count;
+        document.getElementById('traffic-count').textContent = d.traffic_count;
+        document.getElementById('high-count').textContent    = d.high_severity;
+        document.getElementById('crit-count').textContent    = d.critical || 0;
+        document.getElementById('blocked-count').textContent = d.blocked_ips || 0;
+        document.getElementById('uptime-display').textContent = 'Uptime: ' + fmtUptime(d.uptime_sec);
+        document.getElementById('last-updated').textContent  = 'Updated ' + new Date().toLocaleTimeString();
+
+        // Risk score colour
+        const rs = document.getElementById('risk-score');
+        rs.style.color = d.risk_score > 100 ? 'var(--purple)' : d.risk_score > 50 ? 'var(--red)' : d.risk_score > 20 ? 'var(--orange)' : 'var(--red)';
+    }).catch(() => {});
+}
+
+function fetchAlerts() {
+    fetch('/api/alerts?limit=100').then(r => r.json()).then(d => {
+        allAlerts = d;
+        renderAlerts();
+    }).catch(() => {});
+}
+
+function fetchTraffic() {
+    if (!document.getElementById('tab-traffic').classList.contains('active')) return;
+    fetch('/api/traffic?limit=100').then(r => r.json()).then(renderTraffic).catch(() => {});
+}
+
+function fetchTalkers() {
+    if (!document.getElementById('tab-talkers').classList.contains('active')) return;
+    fetch('/api/top_talkers').then(r => r.json()).then(renderTalkers).catch(() => {});
+}
+
+function fetchBlocked() {
+    fetch('/api/blocked').then(r => r.json()).then(renderBlocked).catch(() => {});
+}
+
+// ── Poll Loop ──────────────────────────────────────────────────────────────
+function tick() {
+    fetchStats();
+    fetchAlerts();
+    fetchTraffic();
+    fetchTalkers();
+    fetchBlocked();
+}
+
+setInterval(tick, 2500);
+tick();
 </script>
-
 </body>
 </html>
