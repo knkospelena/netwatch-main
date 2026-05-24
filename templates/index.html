@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NetWatch SOC Dashboard v2.0</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <style>
         :root {
             --bg:        #f0f4f8;
@@ -173,6 +174,89 @@
         /* ── Responsive ── */
         @media (max-width: 1100px) { .stats-grid { grid-template-columns: repeat(3,1fr); } }
         @media (max-width: 700px)  { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+
+        /* ── Icon buttons ── */
+        .icon-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3);
+            background: rgba(255,255,255,.15); color: #fff; cursor: pointer; font-size: 12px;
+            transition: all .2s;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,.28); }
+        .icon-btn.danger { border-color: rgba(255,100,100,.5); color: #fca5a5; }
+        .icon-btn.danger:hover { background: rgba(220,38,38,.25); }
+        .icon-btn svg { width:14px; height:14px; stroke-width:2; }
+        .tab-btn svg { width:14px; height:14px; stroke-width:2; vertical-align:middle; margin-right:4px; }
+        .alert-actions .icon-btn {
+            background:#fff; color:var(--text); border:1px solid var(--border);
+        }
+        .alert-actions .icon-btn:hover { border-color:var(--cyan); color:var(--cyan); background:#e8f0fe; }
+        .alert-actions .icon-btn.danger { color:var(--red); border-color:rgba(220,38,38,.3); background:#fff; }
+        .alert-actions .icon-btn.danger:hover { background:#fff8f8; }
+        .alert-card { cursor: pointer; }
+        .alert-card .click-hint { font-size:0.7rem; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:4px; }
+        .alert-card .click-hint svg { width:12px; height:12px; }
+
+        /* ── Detail Panel ── */
+        #detail-overlay {
+            display:none; position:fixed; inset:0; background:rgba(15,30,60,.45);
+            z-index:200; backdrop-filter:blur(2px);
+        }
+        #detail-overlay.open { display:block; }
+        #detail-panel {
+            position:fixed; right:0; top:0; bottom:0; width:540px; max-width:100vw;
+            background:#fff; box-shadow:-4px 0 24px rgba(26,115,232,.15);
+            z-index:201; overflow-y:auto; transform:translateX(100%);
+            transition:transform .3s cubic-bezier(.4,0,.2,1);
+            display:flex; flex-direction:column;
+        }
+        #detail-panel.open { transform:translateX(0); }
+        .dp-header {
+            padding:16px 20px; border-bottom:1px solid var(--border);
+            background:linear-gradient(90deg,#e8f0fe,#f8faff);
+            display:flex; align-items:flex-start; gap:12px; position:sticky; top:0;
+        }
+        .dp-close {
+            margin-left:auto; background:none; border:none; cursor:pointer;
+            color:var(--muted); padding:4px; border-radius:6px;
+        }
+        .dp-close:hover { background:#e8f0fe; color:var(--cyan); }
+        .dp-close svg { width:20px; height:20px; }
+        .dp-body { padding:20px; flex:1; }
+        .dp-section { margin-bottom:20px; }
+        .dp-section-title {
+            font-size:0.72rem; font-weight:700; text-transform:uppercase;
+            letter-spacing:1px; color:var(--cyan); margin-bottom:10px;
+            display:flex; align-items:center; gap:6px;
+        }
+        .dp-section-title svg { width:14px; height:14px; }
+        .dp-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+        .dp-kv { background:#f0f4f8; border-radius:6px; padding:8px 10px; }
+        .dp-kv label { display:block; font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; }
+        .dp-kv span { font-family:monospace; font-size:0.82rem; color:var(--text); word-break:break-all; }
+        .dp-desc { background:#f8faff; border-left:3px solid var(--cyan); border-radius:0 6px 6px 0; padding:10px 12px; font-size:0.82rem; color:#2d4a6e; line-height:1.6; margin-bottom:12px; }
+        .phase-card { border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+        .phase-card.immediate { background:#fff8f8; border:1px solid rgba(220,38,38,.2); }
+        .phase-card.short     { background:#fffbf0; border:1px solid rgba(217,119,6,.2); }
+        .phase-card.long      { background:#f0fdf4; border:1px solid rgba(21,128,61,.2); }
+        .phase-title {
+            font-size:0.75rem; font-weight:700; text-transform:uppercase;
+            letter-spacing:.5px; margin-bottom:8px;
+            display:flex; align-items:center; gap:6px;
+        }
+        .phase-card.immediate .phase-title { color:#b91c1c; }
+        .phase-card.short     .phase-title { color:#92400e; }
+        .phase-card.long      .phase-title { color:#166534; }
+        .phase-title svg { width:13px; height:13px; }
+        .step-list { list-style:none; }
+        .step-list li {
+            padding:5px 0 5px 20px; font-size:0.8rem; color:var(--text);
+            border-bottom:1px dashed rgba(0,0,0,.06); position:relative; line-height:1.5;
+        }
+        .step-list li:last-child { border:none; }
+        .step-list li::before { content:'›'; position:absolute; left:6px; color:var(--cyan); font-weight:700; }
+        .cmd-box { background:#1e3a5f; color:#a5f3fc; font-family:monospace; font-size:0.75rem; border-radius:6px; padding:8px 12px; margin:6px 0; }
+        .dp-footer { padding:16px 20px; border-top:1px solid var(--border); background:#f8faff; display:flex; gap:8px; }
     </style>
 </head>
 <body>
@@ -182,8 +266,10 @@
     <div class="logo">NETWATCH <span>SOC v2.0</span></div>
     <div class="header-right">
         <span class="uptime" id="uptime-display">Uptime: 0m</span>
-        <div><div class="status-dot" style="display:inline-block"></div><span style="color:#64748b;font-size:.75rem" id="last-updated">Connecting...</span></div>
-        <button class="btn-sm btn-danger" onclick="clearAlerts()">Clear Alerts</button>
+        <div><div class="status-dot" style="display:inline-block"></div><span style="color:rgba(255,255,255,.6);font-size:.75rem" id="last-updated">Connecting...</span></div>
+        <button class="icon-btn danger" onclick="clearAlerts()">
+            <i data-lucide="trash-2"></i> Clear Alerts
+        </button>
     </div>
 </header>
 
@@ -199,10 +285,10 @@
 
 <!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
 <div class="tabs">
-    <button class="tab-btn active" onclick="openTab('tab-alerts')">🚨 Security Alerts</button>
-    <button class="tab-btn" onclick="openTab('tab-traffic')">📡 Live Traffic</button>
-    <button class="tab-btn" onclick="openTab('tab-talkers')">📊 Top Talkers</button>
-    <button class="tab-btn" onclick="openTab('tab-blocked')">🚫 Blocked IPs</button>
+    <button class="tab-btn active" onclick="openTab('tab-alerts',this)"><i data-lucide="shield-alert"></i> Security Alerts</button>
+    <button class="tab-btn" onclick="openTab('tab-traffic',this)"><i data-lucide="activity"></i> Live Traffic</button>
+    <button class="tab-btn" onclick="openTab('tab-talkers',this)"><i data-lucide="bar-chart-2"></i> Top Talkers</button>
+    <button class="tab-btn" onclick="openTab('tab-blocked',this)"><i data-lucide="ban"></i> Blocked IPs</button>
 </div>
 
 <!-- ── Alerts Tab ─────────────────────────────────────────────────────────── -->
@@ -272,8 +358,8 @@
             <div class="panel-sub">Manually blocked via alert actions</div>
         </div>
         <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px">
-            <input type="text" id="manual-block-ip" placeholder="Enter IP to block..." style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none;flex:1">
-            <button class="btn-sm btn-danger" onclick="blockIP(document.getElementById('manual-block-ip').value)">Block</button>
+            <input type="text" id="manual-block-ip" placeholder="Enter IP to block..." style="background:#fff;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;outline:none;flex:1">
+            <button class="icon-btn danger" style="background:#fff;color:var(--red);border-color:rgba(220,38,38,.3);" onclick="blockIP(document.getElementById('manual-block-ip').value)"><i data-lucide="ban"></i> Block</button>
         </div>
         <div class="blocked-list" id="blocked-list">
             <div style="color:var(--muted);padding:20px">No blocked IPs.</div>
@@ -281,178 +367,23 @@
     </div>
 </div>
 
-<script>
-// ── State ──────────────────────────────────────────────────────────────────
-let allAlerts = [];
-
-// ── Tab Switching ──────────────────────────────────────────────────────────
-function openTab(id) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    event.currentTarget.classList.add('active');
-}
-
-// ── Uptime formatter ───────────────────────────────────────────────────────
-function fmtUptime(sec) {
-    if (sec < 60) return sec + 's';
-    if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
-    return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
-}
-
-// ── Render Alert Cards ─────────────────────────────────────────────────────
-function renderAlerts() {
-    const sevF  = document.getElementById('sev-filter').value;
-    const ipF   = document.getElementById('ip-filter').value.toLowerCase();
-    const list  = document.getElementById('alert-list');
-
-    let filtered = allAlerts.filter(a => {
-        if (sevF && a.severity !== sevF) return false;
-        if (ipF && !a.source.toLowerCase().includes(ipF) && !a.target.toLowerCase().includes(ipF)) return false;
-        return true;
-    });
-
-    if (!filtered.length) {
-        list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No alerts match filter.</div>';
-        return;
-    }
-
-    const srcIP = a => a.source.split(':')[0];
-
-    list.innerHTML = filtered.slice(0, 60).map(a => `
-        <div class="alert-card ${a.severity}">
-            <div class="alert-top">
-                <span class="badge ${a.severity}">${a.severity}</span>
-                <span class="badge type">${a.attack_type || 'Alert'}</span>
-                ${a.mitre ? `<span class="badge mitre">MITRE ${a.mitre}</span>` : ''}
-                <span class="alert-title">${a.description}</span>
-                <span class="alert-meta" style="margin-left:auto">${a.timestamp}</span>
-            </div>
-            <div class="alert-route">
-                <span class="ip-tag">${a.source}</span>
-                <span class="arrow">→</span>
-                <span class="ip-tag">${a.target}</span>
-            </div>
-            ${a.detail ? `<div class="alert-detail">${a.detail}</div>` : ''}
-            ${a.recommendation ? `
-            <div class="alert-reco">
-                <div class="alert-reco-label">▶ RECOMMENDED ACTION</div>
-                ${a.recommendation}
-            </div>` : ''}
-            <div class="alert-actions">
-                <button class="btn-sm btn-danger" onclick="blockIP('${srcIP(a)}')">🚫 Block ${srcIP(a)}</button>
-            </div>
+<!-- ── Detail Panel ─────────────────────────────────────────────────────── -->
+<div id="detail-overlay" onclick="closeDetail()"></div>
+<div id="detail-panel">
+    <div class="dp-header">
+        <div>
+            <div id="dp-title" style="font-weight:700;font-size:1rem;color:var(--text)"></div>
+            <div id="dp-sub" style="font-size:0.75rem;color:var(--muted);margin-top:3px"></div>
         </div>
-    `).join('');
-}
+        <button class="dp-close" onclick="closeDetail()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="dp-body" id="dp-body"></div>
+    <div class="dp-footer">
+        <button class="icon-btn danger" id="dp-block-btn" onclick="dpBlock()"><i data-lucide="shield-off"></i> Block Source IP</button>
+        <button class="icon-btn" style="background:#fff;color:var(--cyan);border-color:var(--cyan);" onclick="closeDetail()"><i data-lucide="x-circle"></i> Close</button>
+    </div>
+</div>
 
-// ── Render Traffic Table ───────────────────────────────────────────────────
-function renderTraffic(data) {
-    const tbody = document.querySelector('#traffic-table tbody');
-    if (!data.length) return;
-    tbody.innerHTML = data.map(p => {
-        const rc = p.severity === 'HIGH' ? 'row-high' : p.severity === 'MEDIUM' ? 'row-medium' : '';
-        return `<tr class="${rc}">
-            <td>${p.timestamp}</td>
-            <td>${p.protocol}</td>
-            <td style="font-family:monospace">${p.src}:${p.sport}</td>
-            <td style="color:var(--muted)">→</td>
-            <td style="font-family:monospace">${p.dst}:${p.dport}</td>
-            <td>${p.len}</td>
-            <td>${p.info}</td>
-            <td><span class="badge ${p.severity}">${p.severity}</span></td>
-        </tr>`;
-    }).join('');
-}
-
-// ── Render Top Talkers ─────────────────────────────────────────────────────
-function renderTalkers(data) {
-    const el = document.getElementById('talkers-list');
-    if (!data.length) { el.innerHTML = '<div style="color:var(--muted)">No data yet.</div>'; return; }
-    const max = data[0].count;
-    el.innerHTML = data.map(t => `
-        <div class="talker-bar">
-            <span class="talker-ip">${t.ip}</span>
-            <div class="bar-track"><div class="bar-fill" style="width:${(t.count/max*100).toFixed(1)}%"></div></div>
-            <span class="talker-count">${t.count}</span>
-            <button class="btn-sm btn-danger" onclick="blockIP('${t.ip}')" style="padding:2px 8px;font-size:11px">Block</button>
-        </div>
-    `).join('');
-}
-
-// ── Render Blocked IPs ─────────────────────────────────────────────────────
-function renderBlocked(data) {
-    const el = document.getElementById('blocked-list');
-    if (!data.length) { el.innerHTML = '<div style="color:var(--muted);padding:20px">No blocked IPs.</div>'; return; }
-    el.innerHTML = data.map(ip => `<span class="blocked-tag">🚫 ${ip}</span>`).join('');
-}
-
-// ── Block IP ───────────────────────────────────────────────────────────────
-function blockIP(ip) {
-    if (!ip || !ip.trim()) return;
-    fetch('/api/block', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ip: ip.trim()})
-    }).then(() => { fetchBlocked(); alert('Blocked: ' + ip); });
-}
-
-// ── Clear Alerts ───────────────────────────────────────────────────────────
-function clearAlerts() {
-    if (!confirm('Clear all alerts and reset risk score?')) return;
-    fetch('/api/clear_alerts', {method:'POST'}).then(() => { allAlerts = []; renderAlerts(); });
-}
-
-// ── API Fetchers ───────────────────────────────────────────────────────────
-function fetchStats() {
-    fetch('/api/stats').then(r => r.json()).then(d => {
-        document.getElementById('risk-score').textContent    = d.risk_score;
-        document.getElementById('alert-count').textContent   = d.alert_count;
-        document.getElementById('traffic-count').textContent = d.traffic_count;
-        document.getElementById('high-count').textContent    = d.high_severity;
-        document.getElementById('crit-count').textContent    = d.critical || 0;
-        document.getElementById('blocked-count').textContent = d.blocked_ips || 0;
-        document.getElementById('uptime-display').textContent = 'Uptime: ' + fmtUptime(d.uptime_sec);
-        document.getElementById('last-updated').textContent  = 'Updated ' + new Date().toLocaleTimeString();
-
-        // Risk score colour
-        const rs = document.getElementById('risk-score');
-        rs.style.color = d.risk_score > 100 ? 'var(--purple)' : d.risk_score > 50 ? 'var(--red)' : d.risk_score > 20 ? 'var(--orange)' : 'var(--red)';
-    }).catch(() => {});
-}
-
-function fetchAlerts() {
-    fetch('/api/alerts?limit=100').then(r => r.json()).then(d => {
-        allAlerts = d;
-        renderAlerts();
-    }).catch(() => {});
-}
-
-function fetchTraffic() {
-    if (!document.getElementById('tab-traffic').classList.contains('active')) return;
-    fetch('/api/traffic?limit=100').then(r => r.json()).then(renderTraffic).catch(() => {});
-}
-
-function fetchTalkers() {
-    if (!document.getElementById('tab-talkers').classList.contains('active')) return;
-    fetch('/api/top_talkers').then(r => r.json()).then(renderTalkers).catch(() => {});
-}
-
-function fetchBlocked() {
-    fetch('/api/blocked').then(r => r.json()).then(renderBlocked).catch(() => {});
-}
-
-// ── Poll Loop ──────────────────────────────────────────────────────────────
-function tick() {
-    fetchStats();
-    fetchAlerts();
-    fetchTraffic();
-    fetchTalkers();
-    fetchBlocked();
-}
-
-setInterval(tick, 2500);
-tick();
-</script>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>
